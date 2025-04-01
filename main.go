@@ -13,20 +13,17 @@ import (
 )
 
 func main() {
-	// Initialize configuration
 	if err := config.Init(); err != nil {
 		fmt.Printf("Erro ao inicializar configuração: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Check if OpenAI API key is set
 	if config.AppConfig.OpenAIAPIKey == "" {
 		fmt.Println("Erro: A chave da API do OpenAI não está definida")
 		fmt.Println("Por favor, execute o programa novamente para configurar a chave da API")
 		os.Exit(1)
 	}
 
-	// Initialize the interactive prompt for Sprint ID and Area ID
 	m := cmd.InitialModel()
 	p := tea.NewProgram(m)
 

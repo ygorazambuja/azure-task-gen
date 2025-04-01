@@ -1,0 +1,8 @@
+openai_api_key: "123123123123"
+
+default_task:
+  assigned_to: "Ygor Azambuja"      # Nome do responsável padrão
+  email: "ygor.azambuja@infortechms.com.br"  # Email do responsável padrão
+  activity: "Development"           # Atividade padrão
+  work_item_type: "Task"            # Tipo de item de trabalho
+  default_ust: 4                    # Unidade de Story Point padrão (4h)

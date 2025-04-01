@@ -13,16 +13,20 @@ import (
 )
 
 func main() {
+	// Initialize configuration
 	if err := config.Init(); err != nil {
 		fmt.Printf("Erro ao inicializar configuração: %v\n", err)
 		os.Exit(1)
 	}
 
+	// Check if OpenAI API key is set
 	if config.AppConfig.OpenAIAPIKey == "" {
 		fmt.Println("Erro: A chave da API do OpenAI não está definida")
+		fmt.Println("Por favor, execute o programa novamente para configurar a chave da API")
 		os.Exit(1)
 	}
 
+	// Initialize the interactive prompt for Sprint ID and Area ID
 	m := cmd.InitialModel()
 	p := tea.NewProgram(m)
 
@@ -49,6 +53,7 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Get file changes
 	newFilesDiff, err := commitHelper.GetNewFiles()
 	if err != nil {
 		fmt.Println("Erro: Não foi possível obter os arquivos novos")
@@ -69,6 +74,11 @@ func main() {
 
 	files := append(newFilesDiff, append(modifiedFilesDiff, deletedFilesDiff...)...)
 
+	if len(files) == 0 {
+		fmt.Println("Nenhum arquivo modificado encontrado para processar")
+		os.Exit(0)
+	}
+
 	var wg sync.WaitGroup
 	errChan := make(chan error, len(files))
 	results := make(chan cmd.Output, len(files))
@@ -76,7 +86,7 @@ func main() {
 		wg.Add(1)
 		go func(f string) {
 			defer wg.Done()
-			fmt.Printf("Processing file: %s\n", f)
+			fmt.Printf("Processando arquivo: %s\n", f)
 
 			diff, err := commitHelper.GetFileDiff(f)
 			if err != nil {
@@ -136,6 +146,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Println("Tasks gerados com sucesso")
+	fmt.Println("Tasks gerados com sucesso!")
 	os.Exit(0)
 }

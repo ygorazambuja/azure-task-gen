@@ -5,7 +5,6 @@ import (
 	"os"
 	"strconv"
 	"sync"
-	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/ygorazambuja/azure-task-gen/cmd"
@@ -92,12 +91,14 @@ func main() {
 			}
 
 			results <- response
-
 		}(file)
 	}
 
-	wg.Wait()
-	close(errChan)
+	go func() {
+		wg.Wait()
+		close(errChan)
+		close(results)
+	}()
 
 	for err := range errChan {
 		fmt.Println("Erro:", err)
@@ -122,20 +123,18 @@ func main() {
 			task.EstimateMade = 0
 			task.OriginalEstimate = 0
 			task.RemainingWork = 0
-			task.ItemContrato = ""
-			task.IDSPF = 0
+			task.ItemContrato = "Item 1"
+			task.IDSPF = 19
 			task.UST = config.AppConfig.DefaultTask.DefaultUST
-			task.Complexidade = ""
-
+			task.Complexidade = "BAIXA"
 			taskList.Tasks = append(taskList.Tasks, task)
 		}
 	}
 
-	csv := taskList.GenerateCSV()
-
-	fmt.Println(time.Now().Unix())
-
-	os.WriteFile(fmt.Sprintf("tasks-%d.csv", time.Now().Unix()), []byte(csv), 0644)
+	if err := taskList.GenerateCSV(); err != nil {
+		fmt.Println("Erro ao gerar o arquivo CSV:", err)
+		os.Exit(1)
+	}
 
 	fmt.Println("Tasks gerados com sucesso")
 	os.Exit(0)

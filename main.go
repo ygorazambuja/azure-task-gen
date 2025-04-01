@@ -4,14 +4,22 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"sync"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/ygorazambuja/azure-task-gen/cmd"
+	"github.com/ygorazambuja/azure-task-gen/config"
 	commitHelper "github.com/ygorazambuja/commit-helper/pkg"
 )
 
 func main() {
-	if !HasOpenaiKey() {
+	if err := config.Init(); err != nil {
+		fmt.Printf("Erro ao inicializar configuração: %v\n", err)
+		os.Exit(1)
+	}
+
+	if config.AppConfig.OpenAIAPIKey == "" {
 		fmt.Println("Erro: A chave da API do OpenAI não está definida")
 		os.Exit(1)
 	}
@@ -62,9 +70,73 @@ func main() {
 
 	files := append(newFilesDiff, append(modifiedFilesDiff, deletedFilesDiff...)...)
 
-	fmt.Printf("Files: %v\n", files)
-}
+	var wg sync.WaitGroup
+	errChan := make(chan error, len(files))
+	results := make(chan cmd.Output, len(files))
+	for _, file := range files {
+		wg.Add(1)
+		go func(f string) {
+			defer wg.Done()
+			fmt.Printf("Processing file: %s\n", f)
 
-func HasOpenaiKey() bool {
-	return os.Getenv("OPENAI_API_KEY") != ""
+			diff, err := commitHelper.GetFileDiff(f)
+			if err != nil {
+				errChan <- fmt.Errorf("erro ao obter diff do arquivo %s: %v", f, err)
+				return
+			}
+
+			response, err := cmd.GetOpenAiResponse(f, diff)
+			if err != nil {
+				errChan <- fmt.Errorf("erro ao obter resposta do OpenAI para %s: %v", f, err)
+				return
+			}
+
+			results <- response
+
+		}(file)
+	}
+
+	wg.Wait()
+	close(errChan)
+
+	for err := range errChan {
+		fmt.Println("Erro:", err)
+		os.Exit(1)
+	}
+
+	var taskList cmd.TaskList
+	taskList.Tasks = make([]cmd.Task, 0)
+
+	for result := range results {
+		for _, t := range result.Tasks {
+			var task cmd.Task
+			task.State = "To Do"
+			task.Title = t.Title
+			task.Description = t.Description
+			task.AreaID = areaPathId
+			task.IterationID = sprintId
+			task.Activity = config.AppConfig.DefaultTask.Activity
+			task.AssignedTo = config.AppConfig.DefaultTask.AssignedTo
+			task.WorkItemType = config.AppConfig.DefaultTask.WorkItemType
+			task.ID = ""
+			task.EstimateMade = 0
+			task.OriginalEstimate = 0
+			task.RemainingWork = 0
+			task.ItemContrato = ""
+			task.IDSPF = 0
+			task.UST = config.AppConfig.DefaultTask.DefaultUST
+			task.Complexidade = ""
+
+			taskList.Tasks = append(taskList.Tasks, task)
+		}
+	}
+
+	csv := taskList.GenerateCSV()
+
+	fmt.Println(time.Now().Unix())
+
+	os.WriteFile(fmt.Sprintf("tasks-%d.csv", time.Now().Unix()), []byte(csv), 0644)
+
+	fmt.Println("Tasks gerados com sucesso")
+	os.Exit(0)
 }

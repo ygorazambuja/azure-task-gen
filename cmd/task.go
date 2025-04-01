@@ -1,8 +1,12 @@
 package cmd
 
 import (
+	"encoding/csv"
 	"fmt"
+	"os"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/ygorazambuja/azure-task-gen/config"
 )
@@ -76,28 +80,55 @@ func (t TaskList) GetTasks() []Task {
 	return t.Tasks
 }
 
-func (t TaskList) GenerateCSV() string {
-	csv := "ID,Work Item Type,Title,Assigned To,State,Area ID,Iteration ID,Item Contrato,ID SPF,UST,Complexidade,Activity,Description,Estimate Made,Remaining Work,Original Estimate\n"
-	for _, task := range t.Tasks {
-		csv += task.ID + "," +
-			task.WorkItemType + "," +
-			task.Title + "," +
-			buildAssignedToTask() + "," +
-			task.State + "," +
-			strconv.Itoa(task.AreaID) + "," +
-			strconv.Itoa(task.IterationID) + "," +
-			task.ItemContrato + "," +
-			strconv.Itoa(task.IDSPF) + "," +
-			strconv.Itoa(task.UST) + "," +
-			task.Complexidade + "," +
-			task.Activity + "," +
-			task.Description + "," +
-			strconv.Itoa(task.EstimateMade) + "," +
-			strconv.Itoa(task.RemainingWork) + "," +
-			strconv.Itoa(task.OriginalEstimate) + "\n"
+func (t TaskList) GenerateCSV() error {
+	headers := []string{
+		"ID", "Work Item Type", "Title", "Assigned To", "State", "Area ID",
+		"Iteration ID", "Item Contrato", "ID SPF", "UST", "Complexidade",
+		"Activity", "Description", "Estimate Made", "Remaining Work", "Original Estimate",
 	}
 
-	return csv
+	file, err := os.Create(fmt.Sprintf("tasks-%d.csv", time.Now().Unix()))
+	if err != nil {
+		return fmt.Errorf("erro ao criar arquivo CSV: %v", err)
+	}
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+
+	if err := writer.Write(headers); err != nil {
+		return fmt.Errorf("erro ao escrever cabeçalhos: %v", err)
+	}
+
+	for _, task := range t.Tasks {
+		cleanDescription := strings.ReplaceAll(task.Description, ",", " ")
+		cleanDescription = strings.ReplaceAll(cleanDescription, "\n", " ")
+
+		row := []string{
+			task.ID,
+			task.WorkItemType,
+			task.Title,
+			buildAssignedToTask(),
+			task.State,
+			strconv.Itoa(task.AreaID),
+			strconv.Itoa(task.IterationID),
+			task.ItemContrato,
+			strconv.Itoa(task.IDSPF),
+			strconv.Itoa(task.UST),
+			task.Complexidade,
+			task.Activity,
+			cleanDescription,
+			strconv.Itoa(task.EstimateMade),
+			strconv.Itoa(task.RemainingWork),
+			strconv.Itoa(task.OriginalEstimate),
+		}
+
+		if err := writer.Write(row); err != nil {
+			return fmt.Errorf("erro ao escrever linha de dados: %v", err)
+		}
+	}
+
+	return nil
 }
 
 func buildAssignedToTask() string {
